@@ -6,7 +6,7 @@ import java.util.*
 /**
  * Created by william on 3/21/17.
  */
-class LogPane : Pane() {
+open class LogPane : Pane() {
 
     private val lines = LinkedList<String>()
 
@@ -16,6 +16,11 @@ class LogPane : Pane() {
         while (lines.size > 500) {
             lines.removeAt(0)
         }
+    }
+
+    @Synchronized
+    fun clear() {
+        lines.clear()
     }
 
     override val isDirty = true
