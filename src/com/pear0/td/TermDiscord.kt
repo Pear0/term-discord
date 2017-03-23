@@ -8,10 +8,13 @@ import com.pear0.td.pane.GroupedSelectorPane
 import com.pear0.td.pane.LinearLayoutPane
 import com.pear0.td.pane.ObservingLogPane
 import com.pear0.td.pane.Pane
+import io.reactivex.Observable
 import io.reactivex.Single
+import io.reactivex.SingleOnSubscribe
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDABuilder
+import net.dv8tion.jda.core.entities.Message
 import net.dv8tion.jda.core.events.Event
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.hooks.ListenerAdapter
@@ -86,14 +89,26 @@ object TermDiscord : ListenerAdapter() {
                     val pair = guilds.resolve()
                     if (pair != null) {
 
-                        //jda.getTextChannelById(pair.second.id).history.
+                        val obs = Observable.concatArray(
+                                Single.just(jda.getTextChannelById(pair.second.id).history)
+                                        .flatMapObservable {
+                                            if (it.retrievedHistory.size > 0) Observable.fromIterable(it.retrievedHistory.reversed())
+                                            else {
+                                                Single.create(SingleOnSubscribe<List<Message>> { e ->
+                                                    it.retrievePast(100).queue {
+                                                        e.onSuccess(it.reversed())
+                                                    }
+                                                }).flattenAsObservable { it }
+                                            }
+                                        },
+                                eventStream
+                                        .filter { it is MessageReceivedEvent }
+                                        .cast(MessageReceivedEvent::class.java)
+                                        .filter { it.channel.id == pair.second.id }.map { it.message }
+                        )
 
                         log.clear()
-                        log.setObservable(eventStream
-                                .filter { it is MessageReceivedEvent }
-                                .cast(MessageReceivedEvent::class.java)
-                                .filter { it.channel.id == pair.second.id }
-                                .map { "${it.author.name}: ${it.message.strippedContent}" })
+                        log.setObservable(obs.map { "${it.author.name}: ${it.strippedContent}" })
 
                     }
                 }
