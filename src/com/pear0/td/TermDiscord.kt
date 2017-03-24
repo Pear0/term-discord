@@ -11,6 +11,7 @@ import io.reactivex.SingleOnSubscribe
 import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
+import net.dv8tion.jda.core.JDA
 import net.dv8tion.jda.core.JDABuilder
 import net.dv8tion.jda.core.entities.Message
 import net.dv8tion.jda.core.events.Event
@@ -24,6 +25,10 @@ import java.util.concurrent.TimeUnit
  */
 object TermDiscord : ListenerAdapter() {
 
+    private var jda_: JDA? = null
+
+    val jda: JDA get() = jda_ ?: throw UninitializedPropertyAccessException("JDA has not been initialized!")
+
     val log = ObservingLogPane()
     val guilds = GroupedSelectorPane()
 
@@ -35,7 +40,7 @@ object TermDiscord : ListenerAdapter() {
 
     fun start(args: Array<String>) {
 
-        val jda = JDABuilder(AccountType.CLIENT).setToken(retrieveToken(args)).addListener(this).buildBlocking()
+        jda_ = JDABuilder(AccountType.CLIENT).setToken(retrieveToken(args)).addListener(this).buildBlocking()
 
         for (guild in jda.guilds) {
 

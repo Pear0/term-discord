@@ -28,6 +28,7 @@ class LinearLayoutPane : Pane() {
 
     fun addChild(pane: Pane, weight: Float = 1f, minSize: Int = 0) {
         children.add(PaneEntry(pane = pane, weight = weight, minSize = minSize))
+        pane.parent = this
     }
 
     private fun partition(length: Int): List<Int> {
