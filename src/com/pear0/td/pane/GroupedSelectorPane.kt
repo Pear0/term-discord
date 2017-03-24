@@ -16,7 +16,7 @@ class GroupedSelectorPane : Pane() {
 
     var scrollOffset = 0
 
-    override val isDirty = true
+    override var needsRedraw = true
 
     fun resolve(): Pair<Entry, Entry>? {
         var offset = 0

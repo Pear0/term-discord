@@ -23,7 +23,7 @@ open class LogPane : Pane() {
         lines.clear()
     }
 
-    override val isDirty = true
+    override var needsRedraw = true
 
     @Synchronized
     override fun draw(g: TextGraphics) {

@@ -4,13 +4,11 @@ import com.googlecode.lanterna.graphics.TextGraphics
 import com.googlecode.lanterna.input.KeyType
 import com.googlecode.lanterna.screen.TerminalScreen
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory
-import com.pear0.td.pane.GroupedSelectorPane
-import com.pear0.td.pane.LinearLayoutPane
-import com.pear0.td.pane.ObservingLogPane
-import com.pear0.td.pane.Pane
+import com.pear0.td.pane.*
 import io.reactivex.Observable
 import io.reactivex.Single
 import io.reactivex.SingleOnSubscribe
+import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDABuilder
@@ -19,6 +17,7 @@ import net.dv8tion.jda.core.events.Event
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.hooks.ListenerAdapter
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 /**
  * Created by william on 3/21/17.
@@ -50,25 +49,29 @@ object TermDiscord : ListenerAdapter() {
 
         //screen.newTextGraphics().putString(0, 15, "Hello World")
 
-        val layout = LinearLayoutPane()
-        layout.orientation = LinearLayoutPane.Orientation.HORIZONTAL
+        val layout = StatusLayoutPane().apply { setChild(lambda {
+            val layout = LinearLayoutPane()
+            layout.orientation = LinearLayoutPane.Orientation.HORIZONTAL
 
-        layout.children.add(guilds)
+            layout.addChild(guilds)
 
-        layout.children.add(LinearLayoutPane().apply {
-            orientation = LinearLayoutPane.Orientation.VERTICAL
+            layout.addChild(LinearLayoutPane().apply {
+                orientation = LinearLayoutPane.Orientation.VERTICAL
 
-            this.children.add(object : Pane() {
-                override val isDirty: Boolean
-                    get() = true
+                this.addChild(object : Pane() {
+                    override var needsRedraw: Boolean = true
 
-                override fun draw(g: TextGraphics) {
-                    g.fill('@')
-                }
-            })
+                    override fun draw(g: TextGraphics) {
+                        g.fill('@')
+                    }
+                })
 
-            this.children.add(log)
-        })
+                this.addChild(log)
+            }, 2f)
+
+            layout
+        }) }
+
 
         while (true) {
             while (true) {
@@ -99,6 +102,7 @@ object TermDiscord : ListenerAdapter() {
                                                         e.onSuccess(it.reversed())
                                                     }
                                                 }).flattenAsObservable { it }
+                                                        .delaySubscription(150, TimeUnit.MILLISECONDS)
                                             }
                                         },
                                 eventStream
@@ -114,6 +118,8 @@ object TermDiscord : ListenerAdapter() {
                 }
             }
 
+
+            layout.onLayoutChanged(screen.terminalSize)
             layout.draw(screen.newTextGraphics())
 
             screen.refresh()

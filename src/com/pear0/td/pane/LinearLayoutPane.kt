@@ -14,21 +14,35 @@ class LinearLayoutPane : Pane() {
         VERTICAL
     }
 
-    val children = ArrayList<Pane>()
+    internal data class PaneEntry(val pane: Pane, var position: TerminalPosition = TerminalPosition.TOP_LEFT_CORNER, val weight: Float = 1f, val minSize: Int = 0)
+
+    private val children = ArrayList<PaneEntry>()
 
     var orientation = Orientation.HORIZONTAL
 
-    override val isDirty = children.any(Pane::isDirty)
+    override var needsRedraw = children.any { it.pane.needsRedraw }
+
+    override var needsRelayout: Boolean
+        get() = super.needsRelayout || children.any { it.pane.needsRelayout }
+        set(value) { super.needsRelayout = value }
+
+    fun addChild(pane: Pane, weight: Float = 1f, minSize: Int = 0) {
+        children.add(PaneEntry(pane = pane, weight = weight, minSize = minSize))
+    }
 
     private fun partition(length: Int): List<Int> {
-        val ls = children.map { length / children.size }.toMutableList()
-        for (i in 0 until length % children.size) { ls[i]++ }
+        val weightSum = children.map { it.weight }.sum()
+
+        val ls = children.map { Math.round(it.weight * length / weightSum) }.toMutableList()
+        //for (i in 0 until length % children.size) { ls[i]++ }
 
         return ls
     }
 
-    override fun draw(g: TextGraphics) {
-        val lengths = partition(if (orientation == Orientation.HORIZONTAL) g.size.columns else g.size.rows)
+    override fun onLayoutChanged(/*pos: TerminalPosition,*/ size: TerminalSize) {
+        super.onLayoutChanged(/*pos,*/ size)
+
+        val lengths = partition(if (orientation == Orientation.HORIZONTAL) size.columns else size.rows)
 
 
         fun pos(i: Int) = when(orientation) {
@@ -37,16 +51,32 @@ class LinearLayoutPane : Pane() {
         }
 
         fun size(i: Int) = when(orientation) {
-            Orientation.HORIZONTAL -> TerminalSize(i, g.size.rows)
-            Orientation.VERTICAL -> TerminalSize(g.size.columns, i)
+            Orientation.HORIZONTAL -> TerminalSize(i, size.rows)
+            Orientation.VERTICAL -> TerminalSize(size.columns, i)
         }
 
         var acc = 0
 
         for (i in children.indices) {
-            children[i].draw(g.newTextGraphics(pos(acc), size(lengths[i])))
+            children[i].position = pos(acc)
+            children[i].pane.onLayoutChanged(size(lengths[i]))
+
             acc += lengths[i]
         }
 
     }
+
+    override fun draw(g: TextGraphics) {
+
+
+        for ((pane, position) in children) {
+
+            pane.draw(g.newTextGraphics(position, pane.size))
+        }
+
+    }
+
+    override fun findPaneById(id: String): Pane? {
+        return super.findPaneById(id) ?: children.asSequence().mapNotNull { it.pane.findPaneById(id) }.firstOrNull()
+     }
 }
