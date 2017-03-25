@@ -3,6 +3,7 @@ package com.pear0.td.pane
 import com.googlecode.lanterna.TerminalPosition
 import com.googlecode.lanterna.TerminalSize
 import com.googlecode.lanterna.graphics.TextGraphics
+import com.googlecode.lanterna.input.KeyStroke
 import com.pear0.td.PaneManager
 
 /**
@@ -44,10 +45,17 @@ open class Pane {
         return if (this.id == id) this else null
     }
 
+    fun <T: Pane> findPane(id: String): T? {
+        @Suppress("UNCHECKED_CAST")
+        return findPaneById(id) as T?
+    }
+
     /* Events */
 
-    open fun onFocused() {}
+    open fun onFocused(context: Any? = null) {}
 
     open fun onUnfocused() {}
+
+    open fun onKeyTyped(key: KeyStroke) {}
 
 }

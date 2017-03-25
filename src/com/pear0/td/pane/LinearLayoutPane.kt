@@ -4,6 +4,7 @@ import com.googlecode.lanterna.TerminalPosition
 import com.googlecode.lanterna.TerminalSize
 import com.googlecode.lanterna.graphics.TextGraphics
 import java.util.*
+import kotlin.collections.ArrayList
 
 /**
  * Created by william on 3/21/17.
@@ -31,11 +32,17 @@ class LinearLayoutPane : Pane() {
         pane.parent = this
     }
 
-    private fun partition(length: Int): List<Int> {
-        val weightSum = children.map { it.weight }.sum()
+    private fun partition(length_: Int): List<Int> {
+        var weightSum = children.map { it.weight }.sum()
+        var length = length_
 
-        val ls = children.map { Math.round(it.weight * length / weightSum) }.toMutableList()
-        //for (i in 0 until length % children.size) { ls[i]++ }
+        val ls = ArrayList<Int>(children.size)
+
+        for (i in children.indices) {
+            ls.add(Math.round(children[i].weight * length / weightSum))
+            length -= ls[i]
+            weightSum -= children[i].weight
+        }
 
         return ls
     }

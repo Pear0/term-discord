@@ -51,7 +51,9 @@ run {
     //noinspection GroovyAssignabilityCheck
     //args 'server', 'test.yml'
     jvmArgs '-XX:+UseG1GC'
-    args discordToken
+    if (project.hasProperty('discordToken')) {
+        args project['discordToken']
+    }
 }
 
 task fatJar(type: Jar) {

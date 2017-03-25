@@ -1,24 +1,19 @@
 package com.pear0.td
 
 import com.googlecode.lanterna.graphics.TextGraphics
+import com.googlecode.lanterna.input.KeyStroke
 import com.googlecode.lanterna.input.KeyType
-import com.googlecode.lanterna.screen.TerminalScreen
-import com.googlecode.lanterna.terminal.DefaultTerminalFactory
+import com.pear0.td.action.ComposeMessageAction
+import com.pear0.td.action.UserAction
 import com.pear0.td.pane.*
-import io.reactivex.Observable
-import io.reactivex.Single
-import io.reactivex.SingleOnSubscribe
-import io.reactivex.schedulers.Schedulers
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDA
 import net.dv8tion.jda.core.JDABuilder
-import net.dv8tion.jda.core.entities.Message
 import net.dv8tion.jda.core.events.Event
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.hooks.ListenerAdapter
 import java.io.File
-import java.util.concurrent.TimeUnit
 
 /**
  * Created by william on 3/21/17.
@@ -48,13 +43,14 @@ object TermDiscord : ListenerAdapter() {
 
         }
 
-        val terminal = DefaultTerminalFactory().createTerminal()
-        val screen = TerminalScreen(terminal)
-        screen.startScreen()
+        val terminal = TerminalManager()
 
         //screen.newTextGraphics().putString(0, 15, "Hello World")
 
-        val layout = StatusLayoutPane().apply { setChild(lambda {
+        val paneManager = PaneManager()
+
+        paneManager.root = StatusLayoutPane().apply {
+            id = "status_layout"; setChild(lambda {
             val layout = LinearLayoutPane()
             layout.orientation = LinearLayoutPane.Orientation.HORIZONTAL
 
@@ -75,59 +71,57 @@ object TermDiscord : ListenerAdapter() {
             }, 2f)
 
             layout
-        }) }
+        })
+        }
 
+        fun handleKeyTyped(key: KeyStroke) {
+            //key.character?.let { c -> paneManager.root!!.findPane<StatusLayoutPane>("status_layout")!!.let { it.status = it.status.copy(left = it.status.left + c) } }
 
-        while (true) {
-            while (true) {
-                val key = terminal.pollInput() ?: break
-
-                val oldIndex = guilds.index
-
-                when (key.keyType) {
-                    KeyType.ArrowUp -> {
-                        guilds.move(-1)
-                    }
-                    KeyType.ArrowDown -> {
-                        guilds.move(1)
-                    }
-                }
-
-                if (oldIndex != guilds.index) {
-                    val pair = guilds.resolve()
-                    if (pair != null) {
-
-                        val obs = Observable.concatArray(
-                                Single.just(jda.getTextChannelById(pair.second.id).history)
-                                        .flatMapObservable {
-                                            if (it.retrievedHistory.size > 0) Observable.fromIterable(it.retrievedHistory.reversed())
-                                            else {
-                                                Single.create(SingleOnSubscribe<List<Message>> { e ->
-                                                    it.retrievePast(100).queue {
-                                                        e.onSuccess(it.reversed())
-                                                    }
-                                                }).flattenAsObservable { it }
-                                                        .delaySubscription(150, TimeUnit.MILLISECONDS)
-                                            }
-                                        },
-                                eventStream
-                                        .filter { it is MessageReceivedEvent }
-                                        .cast(MessageReceivedEvent::class.java)
-                                        .filter { it.channel.id == pair.second.id }.map { it.message }
-                        )
-
-                        log.clear()
-                        log.setObservable(obs.map { "${it.author.name}: ${it.strippedContent}" })
-
-                    }
-                }
+            if (paneManager.onKeyTyped(key)) {
+                return
             }
 
 
-            layout.onLayoutChanged(screen.terminalSize)
-            layout.draw(screen.newTextGraphics())
+            when (key.keyType.let {
+                @Suppress("IMPLICIT_CAST_TO_ANY")
+                if (it == KeyType.Character) key.character else it
+            }) {
+                KeyType.ArrowUp, KeyType.ArrowDown -> {
+                    val oldIndex = guilds.index
 
-            screen.refresh()
+                    guilds.move(if (key.keyType == KeyType.ArrowUp) -1 else 1)
+
+                    if (oldIndex != guilds.index) {
+                        val pair = guilds.resolve()
+                        if (pair != null) {
+
+                            log.clear()
+                            log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(pair.second.id)).recentHistory().map { "${it.author.name}: ${it.strippedContent}" })
+
+                        }
+                    }
+                }
+                'm' -> paneManager.setFocus(paneManager.root!!.findPane("status_layout"), context =
+                ComposeMessageAction(jda.getTextChannelById(guilds.resolve()!!.second.id)))
+
+            }
+
+
+
+        }
+
+        terminal.keyStream
+                .observeOn(TermSchedulers.uiThread)
+                .subscribe(::handleKeyTyped)
+
+
+
+        while (true) {
+
+            paneManager.root!!.onLayoutChanged(terminal.screen.terminalSize)
+            paneManager.root!!.draw(terminal.screen.newTextGraphics())
+
+            terminal.screen.refresh()
 
             Thread.sleep(1)
         }

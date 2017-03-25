@@ -1,5 +1,7 @@
 package com.pear0.td
 
+import com.googlecode.lanterna.input.KeyStroke
+import com.googlecode.lanterna.input.KeyType
 import com.pear0.td.pane.Pane
 import java.lang.ref.WeakReference
 import java.util.*
@@ -24,7 +26,7 @@ class PaneManager {
 
     private var focusedElementRef = WeakReference<Pane?>(null)
 
-    fun setFocus(pane: Pane?) {
+    fun setFocus(pane: Pane?, context: Any? = null) {
         if (pane == null) {
             focusedElementRef.get()?.onUnfocused()
             focusedElementRef = WeakReference(null)
@@ -37,10 +39,23 @@ class PaneManager {
 
         focusedElementRef.get()?.onUnfocused()
         focusedElementRef = WeakReference(pane)
-        pane.onFocused()
+        pane.onFocused(context = context)
     }
 
     fun hasFocus(pane: Pane) = focusedElementRef.get() == pane
 
+    fun onKeyTyped(key: KeyStroke): Boolean {
+        val pane = focusedElementRef.get()
+        if (pane != null) {
+            if (key.keyType == KeyType.Escape) {
+                setFocus(null)
+            }else {
+                pane.onKeyTyped(key)
+            }
+            return true
+        }else {
+            return false
+        }
+    }
 
 }
