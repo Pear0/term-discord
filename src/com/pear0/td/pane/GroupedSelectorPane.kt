@@ -7,7 +7,7 @@ import java.util.*
 /**
  * Created by william on 3/22/17.
  */
-class GroupedSelectorPane : Pane() {
+open class GroupedSelectorPane : Pane() {
     data class Entry(val id: String, val name: String)
 
     var groups = LinkedHashMap<Entry, List<Entry>>()
@@ -30,6 +30,27 @@ class GroupedSelectorPane : Pane() {
         return null
     }
 
+    fun select(id: String) {
+
+        var offset = 0
+        for ((group, list) in groups) {
+            if (group.id == id) {
+                index = offset
+                return
+            }
+
+            for ((id1) in list) {
+                if (id1 == id) {
+                    index = offset
+                    return
+                }
+                offset++
+            }
+        }
+    }
+
+    open fun formatEntry(entry: Entry): String = entry.name
+
     override fun draw(g: TextGraphics) {
         super.draw(g)
 
@@ -39,7 +60,7 @@ class GroupedSelectorPane : Pane() {
 
         for ((group, list) in groups) {
             if (selected?.first == group) {
-                g.putString(0, row++, group.name, SGR.BOLD)
+                g.putString(0, row++, formatEntry(group), SGR.BOLD)
 
 
                 for (item in list) {
@@ -55,15 +76,15 @@ class GroupedSelectorPane : Pane() {
                             return
                         }
 
-                        g.putString(0, row++, "  " + item.name, SGR.BOLD)
+                        g.putString(0, row++, "  " + formatEntry(item), SGR.BOLD)
 
                     } else {
-                        g.putString(0, row++, "  " + item.name)
+                        g.putString(0, row++, "  " + formatEntry(item))
                     }
                 }
 
             } else {
-                g.putString(0, row++, group.name)
+                g.putString(0, row++, formatEntry(group))
             }
         }
     }

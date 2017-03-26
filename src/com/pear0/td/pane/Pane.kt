@@ -50,6 +50,17 @@ open class Pane {
         return findPaneById(id) as T?
     }
 
+    fun focus() {
+        PaneManager.findManager(root)?.setFocus(this)
+    }
+
+    fun unfocus() {
+        val manager = PaneManager.findManager(root) ?: return
+        if (manager.hasFocus(this)) {
+            manager.setFocus(null)
+        }
+    }
+
     /* Events */
 
     open fun onFocused(context: Any? = null) {}

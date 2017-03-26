@@ -1,19 +1,23 @@
 package com.pear0.td
 
+import com.googlecode.lanterna.TerminalPosition
 import com.googlecode.lanterna.graphics.TextGraphics
 import com.googlecode.lanterna.input.KeyStroke
 import com.googlecode.lanterna.input.KeyType
-import com.pear0.td.action.ComposeMessageAction
-import com.pear0.td.action.UserAction
+import com.pear0.td.action.CommandAction
+import com.pear0.td.command.CommandDispatcher
 import com.pear0.td.pane.*
+import com.pear0.td.pane.discord.ChannelSelectorPane
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDA
 import net.dv8tion.jda.core.JDABuilder
+import net.dv8tion.jda.core.Permission
 import net.dv8tion.jda.core.events.Event
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.hooks.ListenerAdapter
 import java.io.File
+import javax.imageio.ImageIO
 
 /**
  * Created by william on 3/21/17.
@@ -25,9 +29,15 @@ object TermDiscord : ListenerAdapter() {
     val jda: JDA get() = jda_ ?: throw UninitializedPropertyAccessException("JDA has not been initialized!")
 
     val log = ObservingLogPane()
-    val guilds = GroupedSelectorPane()
+    val guilds = ChannelSelectorPane()
 
     val eventStream: PublishSubject<Event> = PublishSubject.create<Event>()
+
+    val terminal = TerminalManager()
+
+    //screen.newTextGraphics().putString(0, 15, "Hello World")
+
+    val paneManager = PaneManager()
 
     private fun retrieveToken(args: Array<String>): String {
         return args.getOrNull(0) ?: File("local_token.txt").let { if (it.exists()) it.readText() else null } ?: throw RuntimeException("Could not find token")
@@ -38,40 +48,59 @@ object TermDiscord : ListenerAdapter() {
         jda_ = JDABuilder(AccountType.CLIENT).setToken(retrieveToken(args)).addListener(this).buildBlocking()
 
         for (guild in jda.guilds) {
-
-            guilds.groups.put(GroupedSelectorPane.Entry(guild.id, guild.name), guild.textChannels.map { GroupedSelectorPane.Entry(it.id, it.name) })
-
+            println("$guild")
+            if (guild.name != null) {
+                guilds.groups.put(GroupedSelectorPane.Entry(guild.id, guild.name),
+                        guild.textChannels.filter { guild.selfMember.hasPermission(it, Permission.MESSAGE_READ) }.map { GroupedSelectorPane.Entry(it.id, it.name) })
+            }
         }
 
-        val terminal = TerminalManager()
-
-        //screen.newTextGraphics().putString(0, 15, "Hello World")
-
-        val paneManager = PaneManager()
+        val rick = ImageIO.read(File("rick-astley.jpg"))
 
         paneManager.root = StatusLayoutPane().apply {
-            id = "status_layout"; setChild(lambda {
-            val layout = LinearLayoutPane()
-            layout.orientation = LinearLayoutPane.Orientation.HORIZONTAL
+            id = "status_layout"
 
-            layout.addChild(guilds)
+            setChild(PagingLayoutPane().apply {
+                id = "paging_layout"
 
-            layout.addChild(LinearLayoutPane().apply {
-                orientation = LinearLayoutPane.Orientation.VERTICAL
+                addChild(LinearLayoutPane().apply {
+                    orientation = LinearLayoutPane.Orientation.HORIZONTAL
 
-                this.addChild(object : Pane() {
+                    addChild(guilds)
+
+                    addChild(LinearLayoutPane().apply {
+                        orientation = LinearLayoutPane.Orientation.VERTICAL
+
+                        this.addChild(object : Pane() {
+                            override var needsRedraw: Boolean = true
+
+                            override fun draw(g: TextGraphics) {
+                                g.fill('@')
+                            }
+                        })
+
+                        this.addChild(log)
+                    }, 2f)
+                })
+
+                addChild(object : Pane() {
                     override var needsRedraw: Boolean = true
 
                     override fun draw(g: TextGraphics) {
-                        g.fill('@')
+
+                        g.drawImage(TerminalPosition.TOP_LEFT_CORNER, ImageUtils.renderASCIIArt(rick, g.size))
+                        //g.fill('~')
                     }
                 })
 
-                this.addChild(log)
-            }, 2f)
+            })
+        }
 
-            layout
-        })
+        guilds.selectionObservable.subscribe {
+            log.clear()
+            log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(it))
+                    .recentHistory().map { "${it.author.name}: ${it.content}" })
+
         }
 
         fun handleKeyTyped(key: KeyStroke) {
@@ -86,26 +115,27 @@ object TermDiscord : ListenerAdapter() {
                 @Suppress("IMPLICIT_CAST_TO_ANY")
                 if (it == KeyType.Character) key.character else it
             }) {
-                KeyType.ArrowUp, KeyType.ArrowDown -> {
-                    val oldIndex = guilds.index
+            /*KeyType.ArrowUp, KeyType.ArrowDown -> {
+                val oldIndex = guilds.index
 
-                    guilds.move(if (key.keyType == KeyType.ArrowUp) -1 else 1)
+                guilds.move(if (key.keyType == KeyType.ArrowUp) -1 else 1)
 
-                    if (oldIndex != guilds.index) {
-                        val pair = guilds.resolve()
-                        if (pair != null) {
+                if (oldIndex != guilds.index) {
+                    val pair = guilds.resolve()
+                    if (pair != null) {
 
-                            log.clear()
-                            log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(pair.second.id)).recentHistory().map { "${it.author.name}: ${it.strippedContent}" })
+                        log.clear()
+                        log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(pair.second.id)).recentHistory().map { "${it.author.name}: ${it.strippedContent}" })
 
-                        }
                     }
                 }
-                'm' -> paneManager.setFocus(paneManager.root!!.findPane("status_layout"), context =
-                ComposeMessageAction(jda.getTextChannelById(guilds.resolve()!!.second.id)))
+            }*/
+                ':' -> {
+                    val action = CommandAction(CommandDispatcher.defaultDispatcher.asHandler(), displayPrefix = ":")
 
+                    paneManager.setFocus(paneManager.root!!.findPane("status_layout"), context = action)
+                }
             }
-
 
 
         }
@@ -128,6 +158,12 @@ object TermDiscord : ListenerAdapter() {
 
     }
 
+    fun getStatusPane(): StatusLayoutPane = paneManager.root!!.findPane("status_layout")!!
+
+    fun getPagingPane(): PagingLayoutPane = paneManager.root!!.findPane("paging_layout")!!
+
+    fun getChannelsPane() = guilds
+
     override fun onMessageReceived(event: MessageReceivedEvent) {
         //log.append("[${event.channel.name}] ${event.author.name}: ${event.message.strippedContent}")
     }
@@ -136,6 +172,11 @@ object TermDiscord : ListenerAdapter() {
         eventStream.onNext(event)
         //log.append("$event\n")
         //t.toString()
-        println(event)
     }
+
+    fun shutdown() {
+        jda.shutdown()
+        System.exit(0)
+    }
+
 }

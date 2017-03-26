@@ -8,16 +8,26 @@ import com.googlecode.lanterna.input.KeyType
 import com.pear0.td.PaneManager
 import com.pear0.td.TermDiscord
 import com.pear0.td.action.ComposeMessageAction
+import com.pear0.td.action.FormattingStringAction
+import com.pear0.td.action.StringAction
 import com.pear0.td.action.UserAction
 
 /**
  * Created by william on 3/23/17.
  */
 class StatusLayoutPane : Pane() {
-    data class StatusBar(val left: String, val right: String)
+    interface StatusBarEntry {
+        fun draw(g: TextGraphics)
+    }
+
+    class StatusBar(var buffer: String, var right: StatusBarEntry)
+
+    internal class EmptyStatusBarEntry : StatusBarEntry {
+        override fun draw(g: TextGraphics) {}
+    }
 
     private var child: Pane? = null
-    var status: StatusBar = StatusBar("", "")
+    val status: StatusBar = StatusBar("", EmptyStatusBarEntry())
     private var action: UserAction? = null
 
     override var needsRedraw: Boolean
@@ -32,6 +42,7 @@ class StatusLayoutPane : Pane() {
 
     fun setChild(child: Pane) {
         this.child = child
+        child.parent = this
         child.onLayoutChanged(lessRow(size))
     }
 
@@ -43,8 +54,21 @@ class StatusLayoutPane : Pane() {
     override fun draw(g: TextGraphics) {
         super.draw(g)
         child?.draw(g.newTextGraphics(TerminalPosition.TOP_LEFT_CORNER, child!!.size))
-        g.putString(0, size.rows - 1, status.left)
-        g.putString(size.columns - size.columns - 1, size.rows - 1, status.right)
+
+        val statusGraphics = g.newTextGraphics(TerminalPosition(0, size.rows - 1), TerminalSize(size.columns, 1))
+
+        val action = this.action
+
+        statusGraphics.putString(0, 0, when (action) {
+            is FormattingStringAction -> action.format(status.buffer)
+            else -> status.buffer
+        })
+
+        // status.left.draw(statusGraphics)
+        status.right.draw(statusGraphics)
+
+
+        //g.putString(size.columns - size.columns - 1, size.rows - 1, status.right)
     }
 
     override fun onFocused(context: Any?) {
@@ -55,7 +79,7 @@ class StatusLayoutPane : Pane() {
 
     override fun onUnfocused() {
         action = null
-        status = status.copy(left = "")
+        status.buffer = ""
     }
 
     override fun onKeyTyped(key: KeyStroke) {
@@ -63,21 +87,27 @@ class StatusLayoutPane : Pane() {
         when (key.keyType) {
             KeyType.Enter -> {
                 val action = this.action
+                this.action = null
 
+                // an action can set another action
                 when (action) {
-                    is ComposeMessageAction -> {
-                        action.complete(status.left)
+                    is StringAction -> {
+                        action.complete(status.buffer)
                     }
                     else -> {}
                 }
 
-                PaneManager.findManager(root)?.setFocus(null)
+                if (this.action == null) {
+                    unfocus()
+                }
+
             }
             KeyType.Backspace -> {
-                status = status.copy(left = status.left.dropLast(1))
+                status.let { it.buffer = it.buffer.dropLast(1) }
             }
             else -> {
-                status = status.copy(left = status.left + if (key.keyType == KeyType.Character) key.character.toString() else key.keyType.name)
+                status.buffer += if (key.keyType == KeyType.Character) key.character.toString() else "<${key.keyType.name}>"
+
             }
         }
 

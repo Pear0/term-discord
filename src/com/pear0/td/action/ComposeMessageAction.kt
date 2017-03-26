@@ -5,9 +5,9 @@ import net.dv8tion.jda.core.entities.MessageChannel
 /**
  * Created by William on 3/24/2017.
  */
-class ComposeMessageAction(val channel: MessageChannel) : UserAction {
+class ComposeMessageAction(val channel: MessageChannel) : StringAction {
 
-    fun complete(message: String) {
-        channel.sendMessage(message).queue()
+    override fun complete(text: String) {
+        channel.sendMessage(text).queue()
     }
 }
