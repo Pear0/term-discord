@@ -13,6 +13,8 @@ import java.awt.image.BufferedImage
  */
 object ImageUtils {
 
+    private val USE_FULL_RGB = true
+
     private class ColorBucket {
 
         private var red: Float = 0f
@@ -83,7 +85,10 @@ object ImageUtils {
 
                 val color = bucket.getFinalColor()
 
-                val foreground = color.let { TextColor.Indexed.fromRGB(it.red, it.green, it.blue) }
+                val foreground = color.let {
+                    if (USE_FULL_RGB) TextColor.RGB(it.red, it.green, it.blue)
+                    else TextColor.Indexed.fromRGB(it.red, it.green, it.blue)
+                }
 
                 val gValue = color.red * 0.2989 + color.blue * 0.5870 + color.green * 0.1140
 

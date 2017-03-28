@@ -11,7 +11,10 @@ open class GroupedSelectorPane : Pane() {
     data class Entry(val id: String, val name: String)
 
     var groups = LinkedHashMap<Entry, List<Entry>>()
-    var index = 0
+
+    var selectedGroupId: Entry? = null
+        private set
+    var selectedItemId: Entry? = null
         private set
 
     var scrollOffset = 0
@@ -19,32 +22,20 @@ open class GroupedSelectorPane : Pane() {
     override var needsRedraw = true
 
     fun resolve(): Pair<Entry, Entry>? {
-        var offset = 0
-        for ((group, list) in groups) {
-            if (index - offset >= list.size) {
-                offset += list.size
-            } else {
-                return Pair(group, list[index - offset])
-            }
-        }
-        return null
+        fixSelectedIds()
+        return Pair(selectedGroupId ?: return null, selectedItemId ?: return null)
     }
 
     fun select(id: String) {
-
-        var offset = 0
         for ((group, list) in groups) {
-            if (group.id == id) {
-                index = offset
-                return
-            }
 
-            for ((id1) in list) {
-                if (id1 == id) {
-                    index = offset
+            for (item in list) {
+                if (item.id == id) {
+                    selectedGroupId = group
+                    selectedItemId = item
                     return
                 }
-                offset++
+
             }
         }
     }
@@ -89,11 +80,60 @@ open class GroupedSelectorPane : Pane() {
         }
     }
 
+    private fun fixSelectedIds() {
+        if (selectedGroupId == null || selectedGroupId!! !in groups.keys) {
+            selectedGroupId = groups.keys.firstOrNull()
+        }
+
+        if (selectedGroupId != null && (selectedItemId == null || selectedItemId!! !in groups[selectedGroupId!!]!!)) {
+            selectedItemId = groups[selectedGroupId!!]!!.firstOrNull()
+        } else if (selectedGroupId == null) {
+            selectedItemId = null
+        }
+    }
+
     fun move(amt: Int) {
-        index += amt
-        if (index < 0) index = 0
-        val totalSize = groups.map { it.value.size }.sum()
-        if (totalSize in 1..index) index = totalSize - 1
+        fixSelectedIds()
+
+        if (amt > 0) repeat(amt) {
+            val list = groups[selectedGroupId]!!
+
+            val index = selectedItemId?.let { list.indexOf(it) }
+
+            if (index == null || index == list.lastIndex) {
+                val groupList = groups.keys.toList()
+
+                val nextGroupIndex = groupList.indexOf(selectedGroupId!!) + 1
+
+                if (nextGroupIndex in groupList.indices) {
+                    selectedGroupId = groupList[nextGroupIndex]
+                    selectedItemId = null
+                }
+            } else {
+                selectedItemId = list[index + 1]
+            }
+        }
+
+        if (amt < 0) repeat(-amt) {
+            val list = groups[selectedGroupId]!!
+
+            val index = selectedItemId?.let { list.indexOf(it) }
+
+            if (index == null || index <= 0) {
+                val groupList = groups.keys.toList()
+
+                val prevGroupIndex = groupList.indexOf(selectedGroupId!!) - 1
+
+                if (prevGroupIndex in groupList.indices) {
+                    selectedGroupId = groupList[prevGroupIndex]
+                    selectedItemId = groups[selectedGroupId!!]?.lastOrNull()
+                }
+
+            } else {
+                selectedItemId = list[index - 1]
+            }
+        }
+
     }
 
 }

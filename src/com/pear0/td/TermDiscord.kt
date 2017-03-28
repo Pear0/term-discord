@@ -8,12 +8,16 @@ import com.pear0.td.action.CommandAction
 import com.pear0.td.command.CommandDispatcher
 import com.pear0.td.pane.*
 import com.pear0.td.pane.discord.ChannelSelectorPane
+import com.pear0.td.pane.discord.DiscordSelectorPane
+import com.pear0.td.pane.discord.VoiceSelectorPane
 import io.reactivex.subjects.PublishSubject
 import net.dv8tion.jda.core.AccountType
 import net.dv8tion.jda.core.JDA
 import net.dv8tion.jda.core.JDABuilder
 import net.dv8tion.jda.core.Permission
 import net.dv8tion.jda.core.events.Event
+import net.dv8tion.jda.core.events.guild.GuildJoinEvent
+import net.dv8tion.jda.core.events.guild.GuildLeaveEvent
 import net.dv8tion.jda.core.events.message.MessageReceivedEvent
 import net.dv8tion.jda.core.hooks.ListenerAdapter
 import java.io.File
@@ -29,7 +33,8 @@ object TermDiscord : ListenerAdapter() {
     val jda: JDA get() = jda_ ?: throw UninitializedPropertyAccessException("JDA has not been initialized!")
 
     val log = ObservingLogPane()
-    val guilds = ChannelSelectorPane()
+
+    val rxDiscord = RxDiscordAdapter()
 
     val eventStream: PublishSubject<Event> = PublishSubject.create<Event>()
 
@@ -45,15 +50,17 @@ object TermDiscord : ListenerAdapter() {
 
     fun start(args: Array<String>) {
 
-        jda_ = JDABuilder(AccountType.CLIENT).setToken(retrieveToken(args)).addListener(this).buildBlocking()
+        jda_ = JDABuilder(AccountType.CLIENT).setToken(retrieveToken(args)).addListener(this).addListener(rxDiscord).buildBlocking()
 
-        for (guild in jda.guilds) {
+        rxDiscord.guilds.subscribe { println(it.map { it.name }) }
+
+        /*for (guild in jda.guilds) {
             println("$guild")
             if (guild.name != null) {
                 guilds.groups.put(GroupedSelectorPane.Entry(guild.id, guild.name),
                         guild.textChannels.filter { guild.selfMember.hasPermission(it, Permission.MESSAGE_READ) }.map { GroupedSelectorPane.Entry(it.id, it.name) })
             }
-        }
+        }*/
 
         val rick = ImageIO.read(File("rick-astley.jpg"))
 
@@ -66,7 +73,27 @@ object TermDiscord : ListenerAdapter() {
                 addChild(LinearLayoutPane().apply {
                     orientation = LinearLayoutPane.Orientation.HORIZONTAL
 
-                    addChild(guilds)
+                    addChild(ChannelSelectorPane(rxDiscord.guilds, rxDiscord::textChannels).apply { id = "channel_selector" })
+
+                    addChild(LinearLayoutPane().apply {
+                        orientation = LinearLayoutPane.Orientation.VERTICAL
+
+                        this.addChild(object : Pane() {
+                            override var needsRedraw: Boolean = true
+
+                            override fun draw(g: TextGraphics) {
+                                g.fill('@')
+                            }
+                        })
+
+                        this.addChild(log)
+                    }, 2f)
+                })
+
+                addChild(LinearLayoutPane().apply {
+                    orientation = LinearLayoutPane.Orientation.HORIZONTAL
+
+                    addChild(VoiceSelectorPane(rxDiscord.guilds, rxDiscord::voiceChannels).apply { id = "voice_selector" })
 
                     addChild(LinearLayoutPane().apply {
                         orientation = LinearLayoutPane.Orientation.VERTICAL
@@ -96,7 +123,7 @@ object TermDiscord : ListenerAdapter() {
             })
         }
 
-        guilds.selectionObservable.subscribe {
+        getChannelsPane().selectionObservable.subscribe {
             log.clear()
             log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(it))
                     .recentHistory().map { "${it.author.name}: ${it.content}" })
@@ -115,21 +142,6 @@ object TermDiscord : ListenerAdapter() {
                 @Suppress("IMPLICIT_CAST_TO_ANY")
                 if (it == KeyType.Character) key.character else it
             }) {
-            /*KeyType.ArrowUp, KeyType.ArrowDown -> {
-                val oldIndex = guilds.index
-
-                guilds.move(if (key.keyType == KeyType.ArrowUp) -1 else 1)
-
-                if (oldIndex != guilds.index) {
-                    val pair = guilds.resolve()
-                    if (pair != null) {
-
-                        log.clear()
-                        log.setObservable(HistoryManager.getHistory(jda.getTextChannelById(pair.second.id)).recentHistory().map { "${it.author.name}: ${it.strippedContent}" })
-
-                    }
-                }
-            }*/
                 ':' -> {
                     val action = CommandAction(CommandDispatcher.defaultDispatcher.asHandler(), displayPrefix = ":")
 
@@ -148,6 +160,8 @@ object TermDiscord : ListenerAdapter() {
 
         while (true) {
 
+            terminal.screen.doResizeIfNecessary()
+
             paneManager.root!!.onLayoutChanged(terminal.screen.terminalSize)
             paneManager.root!!.draw(terminal.screen.newTextGraphics())
 
@@ -162,7 +176,9 @@ object TermDiscord : ListenerAdapter() {
 
     fun getPagingPane(): PagingLayoutPane = paneManager.root!!.findPane("paging_layout")!!
 
-    fun getChannelsPane() = guilds
+    fun getChannelsPane(): ChannelSelectorPane = paneManager.root!!.findPane("channel_selector")!!
+
+    fun getVoicesPane(): VoiceSelectorPane = paneManager.root!!.findPane("voice_selector")!!
 
     override fun onMessageReceived(event: MessageReceivedEvent) {
         //log.append("[${event.channel.name}] ${event.author.name}: ${event.message.strippedContent}")
@@ -173,6 +189,7 @@ object TermDiscord : ListenerAdapter() {
         //log.append("$event\n")
         //t.toString()
     }
+
 
     fun shutdown() {
         jda.shutdown()

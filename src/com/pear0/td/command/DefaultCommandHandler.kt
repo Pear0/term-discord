@@ -12,10 +12,13 @@ internal class DefaultCommandHandler : CommandHandler {
         QUIT("Quits term-discord.", TermDiscord::shutdown),
         MESSAGE("Message the current channel.", {
             TermDiscord.paneManager.setFocus(TermDiscord.getStatusPane(), context =
-            ComposeMessageAction(TermDiscord.jda.getTextChannelById(TermDiscord.guilds.getHighlightedChannelId()!!)))
+            ComposeMessageAction(TermDiscord.jda.getTextChannelById(TermDiscord.getChannelsPane().getHighlightedChannelId()!!)))
         }),
         CHANNELSELECT("Change the current channel", {
             TermDiscord.paneManager.setFocus(TermDiscord.getChannelsPane())
+        }),
+        VOICESELECT("Change the current voice channel", {
+            TermDiscord.paneManager.setFocus(TermDiscord.getVoicesPane())
         }),
         PREV("Jump to previous page", { TermDiscord.getPagingPane().changePage(-1) }),
         NEXT("Jump to next page", { TermDiscord.getPagingPane().changePage(1) })
