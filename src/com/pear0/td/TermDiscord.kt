@@ -7,6 +7,7 @@ import com.googlecode.lanterna.input.KeyType
 import com.pear0.td.action.CommandAction
 import com.pear0.td.command.CommandDispatcher
 import com.pear0.td.pane.*
+import com.pear0.td.pane.discord.AudioConnectionPane
 import com.pear0.td.pane.discord.ChannelSelectorPane
 import com.pear0.td.pane.discord.DiscordSelectorPane
 import com.pear0.td.pane.discord.VoiceSelectorPane
@@ -95,19 +96,7 @@ object TermDiscord : ListenerAdapter() {
 
                     addChild(VoiceSelectorPane(rxDiscord.guilds, rxDiscord::voiceChannels).apply { id = "voice_selector" })
 
-                    addChild(LinearLayoutPane().apply {
-                        orientation = LinearLayoutPane.Orientation.VERTICAL
-
-                        this.addChild(object : Pane() {
-                            override var needsRedraw: Boolean = true
-
-                            override fun draw(g: TextGraphics) {
-                                g.fill('@')
-                            }
-                        })
-
-                        this.addChild(log)
-                    }, 2f)
+                    addChild(AudioConnectionPane(), 2f)
                 })
 
                 addChild(object : Pane() {

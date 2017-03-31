@@ -9,11 +9,13 @@ import net.dv8tion.jda.core.entities.VoiceChannel
 import net.dv8tion.jda.core.events.Event
 import net.dv8tion.jda.core.events.channel.text.TextChannelCreateEvent
 import net.dv8tion.jda.core.events.channel.text.TextChannelDeleteEvent
+import net.dv8tion.jda.core.events.channel.voice.GenericVoiceChannelEvent
 import net.dv8tion.jda.core.events.channel.voice.VoiceChannelCreateEvent
 import net.dv8tion.jda.core.events.channel.voice.VoiceChannelDeleteEvent
 import net.dv8tion.jda.core.events.guild.GenericGuildEvent
 import net.dv8tion.jda.core.events.guild.GuildJoinEvent
 import net.dv8tion.jda.core.events.guild.GuildLeaveEvent
+import net.dv8tion.jda.core.events.guild.voice.GenericGuildVoiceEvent
 import net.dv8tion.jda.core.hooks.EventListener
 import net.dv8tion.jda.core.hooks.ListenerAdapter
 
@@ -41,6 +43,8 @@ class RxDiscordAdapter : EventListener {
                     events.filterCast<TextChannelCreateEvent>().map { it.jda.guilds.flatMap { it.textChannels }.filter { g -> g.id != it.channel.id } + listOf(it.channel) },
                     events.filterCast<TextChannelDeleteEvent>().map { it.jda.guilds.flatMap { it.textChannels }.filter { g -> g.id != it.channel.id } }
             )
+
+    val voiceEvents: Observable<GenericGuildVoiceEvent> = events.filterCast()
 
     fun textChannels(guild: Guild): Observable<List<TextChannel>> =
             Observable.mergeArray(

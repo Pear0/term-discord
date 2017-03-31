@@ -21,7 +21,20 @@ internal class DefaultCommandHandler : CommandHandler {
             TermDiscord.paneManager.setFocus(TermDiscord.getVoicesPane())
         }),
         PREV("Jump to previous page", { TermDiscord.getPagingPane().changePage(-1) }),
-        NEXT("Jump to next page", { TermDiscord.getPagingPane().changePage(1) })
+        NEXT("Jump to next page", { TermDiscord.getPagingPane().changePage(1) }),
+
+        VOICEJOIN("Join selected channel", {
+            val channel = TermDiscord.getVoicesPane().resolve()?.second?.id?.let { TermDiscord.jda.getVoiceChannelById(it) }
+            channel?.guild?.audioManager?.let {
+                it.openAudioConnection(channel)
+                val t = com.pear0.td.SystemAudioHandler()
+                it.sendingHandler = t
+                it.setReceivingHandler(t)
+            }
+        }),
+        VOICELEAVE("Leave voice channel", {
+            TermDiscord.jda.guilds.forEach { it.audioManager.closeAudioConnection(); it.audioManager.setReceivingHandler(null); it.audioManager.sendingHandler = null }
+        }),
 
         ;
 
